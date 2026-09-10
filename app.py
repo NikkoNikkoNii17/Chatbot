@@ -59,16 +59,16 @@ def init_rag(api_key):
     return rag_chain
 
 # --- Sidebar ---
-api_key = st.sidebar.text_input("Enter Groq API Key", type="password")
-
 st.sidebar.markdown("### How to use:")
-st.sidebar.markdown("1. Make sure you have your documents in the `my_data/` folder.")
-st.sidebar.markdown("2. Enter your Groq API key above.")
-st.sidebar.markdown("3. Ask questions about the documents.")
+st.sidebar.markdown("1. Ask questions about the nephrotic syndrome documents.")
+st.sidebar.markdown("2. The chatbot will only answer based on the provided domain data.")
 
 # --- Main App Logic ---
-if not api_key:
-    st.info("Please enter your Groq API Key in the sidebar to initialize the chatbot.")
+# Attempt to get the API key from Streamlit Secrets
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except KeyError:
+    st.error("Groq API Key not found! Please add it to your Streamlit Secrets.")
     st.stop()
 
 if not os.path.exists("my_data") or not os.listdir("my_data"):
