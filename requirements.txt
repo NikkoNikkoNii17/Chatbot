@@ -7,6 +7,5 @@ langchain-groq<1.0
 langchain-huggingface<1.0
 chromadb
 pypdf
-unstructured[pdf]
 sentence-transformers
 pydantic<2.0.0
