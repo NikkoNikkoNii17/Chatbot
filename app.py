@@ -36,32 +36,48 @@ def init_rag(api_key):
     # Set vectorstore as a retriever
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    # Initialize the SLM (OpenAI model on Groq as per notebook)
-    llm = ChatGroq(model_name="openai/gpt-oss-20b", temperature=0)
-
-    # Custom domain system prompt
-    system_prompt = (
+    # === BASELINE MODEL (Grounded) ===
+    llm_baseline = ChatGroq(model_name="openai/gpt-oss-20b", temperature=0)
+    system_prompt_baseline = (
         "You are a specialized AI assistant for the user's uploaded domain.\n"
         "Answer questions strictly using ONLY the provided context below.\n"
         "If the answer cannot be found in the context, reply: 'I cannot answer based on the provided domain data.'\n\n"
         "Context:\n{context}"
     )
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
+    prompt_baseline = ChatPromptTemplate.from_messages([
+        ("system", system_prompt_baseline),
         ("human", "{input}"),
     ])
+    combine_docs_chain_baseline = create_stuff_documents_chain(llm_baseline, prompt_baseline)
+    rag_chain_baseline = create_retrieval_chain(retriever, combine_docs_chain_baseline)
 
-    # Assemble full retrieval-augmented generation chain
-    combine_docs_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, combine_docs_chain)
+    # === STRESS-TEST MODEL (Hallucination) ===
+    llm_stress = ChatGroq(model_name="openai/gpt-oss-20b", temperature=1.0)
+    system_prompt_stress = (
+        "You are a specialized AI assistant for the user's uploaded domain.\n"
+        "Answer questions strictly using ONLY the provided context below.\n\n"
+        "Context:\n{context}"
+    )
+    prompt_stress = ChatPromptTemplate.from_messages([
+        ("system", system_prompt_stress),
+        ("human", "{input}"),
+    ])
+    combine_docs_chain_stress = create_stuff_documents_chain(llm_stress, prompt_stress)
+    rag_chain_stress = create_retrieval_chain(retriever, combine_docs_chain_stress)
     
-    return rag_chain
+    return rag_chain_baseline, rag_chain_stress
 
 # --- Sidebar ---
+st.sidebar.markdown("### Testing Mode")
+test_mode = st.sidebar.radio(
+    "Select Model Behavior:",
+    ["Baseline (Grounded)", "Stress-test (Hallucination)"]
+)
+
+st.sidebar.markdown("---")
 st.sidebar.markdown("### How to use:")
 st.sidebar.markdown("1. Ask questions about the nephrotic syndrome documents.")
-st.sidebar.markdown("2. The chatbot will only answer based on the provided domain data.")
+st.sidebar.markdown("2. Switch testing modes to see how temperature and prompt fallbacks affect hallucinations.")
 
 # --- Main App Logic ---
 # Attempt to get the API key from Streamlit Secrets
@@ -77,7 +93,14 @@ if not os.path.exists("my_data") or not os.listdir("my_data"):
 
 with st.spinner("Initializing RAG pipeline (this may take a moment)..."):
     try:
-        rag_chain = init_rag(api_key)
+        rag_chain_baseline, rag_chain_stress = init_rag(api_key)
+        
+        # Select the active chain based on the sidebar toggle
+        if test_mode == "Baseline (Grounded)":
+            rag_chain = rag_chain_baseline
+        else:
+            rag_chain = rag_chain_stress
+            
     except Exception as e:
         st.error(f"Error initializing RAG pipeline: {e}")
         st.stop()
